@@ -4,6 +4,8 @@ class AnimationStudio {
     this.ctx = this.canvas.getContext("2d", { alpha: true });
     this.fpsCounter = document.getElementById("fpsCounter");
     this.playPauseBtn = document.getElementById("playPauseBtn");
+    this.undoBtn = document.getElementById("undoBtn");
+    this.redoBtn = document.getElementById("redoBtn");
     this.clearBtn = document.getElementById("clearBtn");
     this.exportBtn = document.getElementById("exportBtn");
     this.addFrameBtn = document.getElementById("addFrameBtn");
@@ -51,6 +53,9 @@ class AnimationStudio {
     this.currentFPS = 0;
     this.pointerDown = false;
     this.lastPoint = null;
+    this.undoStack = [];
+    this.redoStack = [];
+    this.preDrawState = null;
 
     this.setupCanvas();
     this.createInitialFrame();
@@ -90,6 +95,8 @@ class AnimationStudio {
     window.addEventListener("pointermove", this.onPointerMove.bind(this));
     window.addEventListener("pointerup", this.onPointerUp.bind(this));
     this.playPauseBtn.addEventListener("click", this.togglePlayback.bind(this));
+    this.undoBtn.addEventListener("click", this.undo.bind(this));
+    this.redoBtn.addEventListener("click", this.redo.bind(this));
     this.clearBtn.addEventListener("click", this.clearCanvas.bind(this));
     this.exportBtn.addEventListener("click", this.exportPNG.bind(this));
     this.addFrameBtn.addEventListener("click", this.addBlankFrame.bind(this));
@@ -137,6 +144,7 @@ class AnimationStudio {
     this.brushButtons.forEach((button) =>
       button.addEventListener("click", this.onBrushSelect.bind(this)),
     );
+    this.updateUndoRedoButtons();
   }
 
   onBrushSelect(event) {
@@ -243,10 +251,12 @@ class AnimationStudio {
     if (this.isPlaying) return;
     const point = this.normalizePoint(event);
     if (this.brushSettings.mode === "fill") {
+      this.saveUndoState();
       this.fillAreaAt(point, this.brushSettings.color);
       this.commitCurrentFrame();
       return;
     }
+    this.saveUndoState();
     this.pointerDown = true;
     this.canvas.setPointerCapture(event.pointerId);
     this.lastPoint = point;
@@ -282,7 +292,9 @@ class AnimationStudio {
   }
 
   drawAtPoint(point, isPress = false) {
-    if (this.brushSettings.mode === "airbrush") {
+    if (this.brushSettings.mode === "eraser") {
+      this.paintEraser(point);
+    } else if (this.brushSettings.mode === "airbrush") {
       this.paintAirbrush(point);
     } else if (this.brushSettings.mode === "pencil") {
       this.paintPencil(point, isPress);
@@ -460,6 +472,18 @@ class AnimationStudio {
     this.ctx.fillStyle = gradient;
     this.ctx.beginPath();
     this.ctx.arc(point.x, point.y, radius, 0, Math.PI * 2);
+    this.ctx.fill();
+    this.ctx.restore();
+  }
+
+  paintEraser(point) {
+    const size = this.brushSettings.diameter;
+    this.ctx.save();
+    this.ctx.globalCompositeOperation = "destination-out";
+    this.ctx.globalAlpha = this.brushSettings.opacity;
+    this.ctx.fillStyle = "rgba(0, 0, 0, 1)";
+    this.ctx.beginPath();
+    this.ctx.arc(point.x, point.y, size * 0.5, 0, Math.PI * 2);
     this.ctx.fill();
     this.ctx.restore();
   }
@@ -685,6 +709,55 @@ class AnimationStudio {
       anchor.remove();
       URL.revokeObjectURL(url);
     }, "image/png");
+  }
+
+  saveUndoState() {
+    const width = this.canvas.dataset.baseWidth;
+    const height = this.canvas.dataset.baseHeight;
+    const currentImageData = this.ctx.getImageData(0, 0, width, height);
+    this.undoStack.push({
+      frameIndex: this.activeIndex,
+      imageData: currentImageData,
+    });
+    this.redoStack = [];
+    this.updateUndoRedoButtons();
+  }
+
+  undo() {
+    if (this.undoStack.length === 0) return;
+    const width = this.canvas.dataset.baseWidth;
+    const height = this.canvas.dataset.baseHeight;
+    const currentImageData = this.ctx.getImageData(0, 0, width, height);
+    this.redoStack.push({
+      frameIndex: this.activeIndex,
+      imageData: currentImageData,
+    });
+    const state = this.undoStack.pop();
+    this.activeIndex = state.frameIndex;
+    this.ctx.putImageData(state.imageData, 0, 0);
+    this.commitCurrentFrame();
+    this.updateUndoRedoButtons();
+  }
+
+  redo() {
+    if (this.redoStack.length === 0) return;
+    const width = this.canvas.dataset.baseWidth;
+    const height = this.canvas.dataset.baseHeight;
+    const currentImageData = this.ctx.getImageData(0, 0, width, height);
+    this.undoStack.push({
+      frameIndex: this.activeIndex,
+      imageData: currentImageData,
+    });
+    const state = this.redoStack.pop();
+    this.activeIndex = state.frameIndex;
+    this.ctx.putImageData(state.imageData, 0, 0);
+    this.commitCurrentFrame();
+    this.updateUndoRedoButtons();
+  }
+
+  updateUndoRedoButtons() {
+    this.undoBtn.disabled = this.undoStack.length === 0;
+    this.redoBtn.disabled = this.redoStack.length === 0;
   }
 }
 

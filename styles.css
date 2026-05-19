@@ -348,6 +348,12 @@ footer {
   padding: 0;
 }
 
+.timeline-controls button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  color: var(--text-secondary);
+}
+
 .frame-deck {
   display: grid;
   grid-auto-flow: column;

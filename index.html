@@ -16,10 +16,8 @@
         <strong id="fpsCounter">FPS 0</strong>
       </div>
       <div class="toolbar" role="toolbar" aria-label="Primary studio controls">
-        <button id="playPauseBtn" class="primary" type="button">Play</button>
         <button id="clearBtn" type="button">Clear Canvas</button>
-        <button id="duplicateFrameBtn" type="button">Duplicate Frame</button>
-        <button id="exportBtn" class="danger" type="button">Export PNG</button>
+        <button id="exportBtn" class="primary" type="button">Export PNG</button>
       </div>
     </header>
 
@@ -82,6 +80,16 @@
             >
               Fill Tool
               <small>Drag a color onto the canvas to flood fill an area</small>
+            </button>
+            <button
+              class="brush-button"
+              data-brush="eraser"
+              type="button"
+              role="radio"
+              aria-checked="false"
+            >
+              Eraser
+              <small>Remove content with a soft erasure brush</small>
             </button>
           </div>
         </div>
@@ -202,8 +210,12 @@
       <div class="timeline-shell">
         <div class="timeline-controls">
           <div class="timeline-buttons">
-            <button id="addFrameBtn" type="button">Add Keyframe</button>
-            <button id="removeFrameBtn" type="button">Remove Keyframe</button>
+            <button id="undoBtn" type="button" title="Undo">↶ Undo</button>
+            <button id="redoBtn" type="button" title="Redo">↷ Redo</button>
+            <button id="playPauseBtn" class="primary" type="button">▶ Play</button>
+            <button id="duplicateFrameBtn" type="button">⧉ Duplicate</button>
+            <button id="addFrameBtn" type="button">+ Keyframe</button>
+            <button id="removeFrameBtn" type="button">− Remove</button>
           </div>
           <div class="timeline-fps-controls">
             <button id="fpsDownBtn" type="button">- FPS</button>
