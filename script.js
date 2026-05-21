@@ -98,7 +98,7 @@ class AnimationStudio {
     this.undoBtn.addEventListener("click", this.undo.bind(this));
     this.redoBtn.addEventListener("click", this.redo.bind(this));
     this.clearBtn.addEventListener("click", this.clearCanvas.bind(this));
-    this.exportBtn.addEventListener("click", this.exportPNG.bind(this));
+    this.exportBtn.addEventListener("click", this.exportMP4.bind(this));
     this.addFrameBtn.addEventListener("click", this.addBlankFrame.bind(this));
     this.duplicateFrameBtn.addEventListener(
       "click",
@@ -696,19 +696,41 @@ class AnimationStudio {
     this.frameCountLabel.textContent = this.timeline.length;
   }
 
-  exportPNG() {
+  exportMP4() {
     this.commitCurrentFrame();
-    this.canvas.toBlob((blob) => {
-      if (!blob) return;
+    const stream = this.canvas.captureStream(24);
+    const supportedType = MediaRecorder.isTypeSupported("video/mp4")
+      ? "video/mp4"
+      : MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
+      ? "video/webm;codecs=vp9"
+      : "video/webm";
+    const recorder = new MediaRecorder(stream, { mimeType: supportedType });
+    const chunks = [];
+
+    recorder.ondataavailable = (event) => {
+      if (event.data.size > 0) {
+        chunks.push(event.data);
+      }
+    };
+
+    recorder.onstop = () => {
+      const blob = new Blob(chunks, { type: supportedType });
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = "masonmation-frame.png";
+      anchor.download = supportedType.includes("mp4")
+        ? "masonmation-animation.mp4"
+        : "masonmation-animation.webm";
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
       URL.revokeObjectURL(url);
-    }, "image/png");
+    };
+
+    recorder.start();
+    setTimeout(() => {
+      recorder.stop();
+    }, 600);
   }
 
   saveUndoState() {
