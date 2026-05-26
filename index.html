@@ -7,246 +7,90 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <header>
-      <div class="brand">
-        <h1>Masonmation Studio</h1>
-        <span>MP4-ready animation workspace</span>
-      </div>
-      <div class="metric" aria-live="polite">
-        <strong id="fpsCounter">FPS 0</strong>
-      </div>
-      <div class="toolbar" role="toolbar" aria-label="Primary studio controls">
-        <button id="exportBtn" class="primary" type="button">Export MP4</button>
-      </div>
-    </header>
+    <main class="home-main">
+      <div class="home-container">
+        <header class="home-header">
+          <div>
+            <h1>Masonmation</h1>
+          </div>
+        </header>
 
-    <main>
-      <section class="studio-panel" aria-label="Central drawing workspace">
-        <div class="canvas-shell">
-          <canvas
-            id="studioCanvas"
-            width="1280"
-            height="720"
-            aria-label="Animation canvas"
-          ></canvas>
-        </div>
-      </section>
-      <aside aria-label="Brush and animation controls">
-        <div class="panel-group">
-          <h2>Brush Library</h2>
-          <div
-            class="brush-list"
-            role="radiogroup"
-            aria-label="Brush selection"
-          >
-            <button
-              class="brush-button active"
-              data-brush="technical"
-              type="button"
-              role="radio"
-              aria-checked="true"
-            >
-              Technical Pen
-              <small>Sharp, crisp strokes with polished anti-aliasing</small>
-            </button>
-            <button
-              class="brush-button"
-              data-brush="pencil"
-              type="button"
-              role="radio"
-              aria-checked="false"
-            >
-              Sketching Pencil
-              <small>Graphite grain with textured opacity build-up</small>
-            </button>
-            <button
-              class="brush-button"
-              data-brush="airbrush"
-              type="button"
-              role="radio"
-              aria-checked="false"
-            >
-              Airbrush
-              <small>Soft radial fading for atmospheric glow</small>
-            </button>
-            <button
-              class="brush-button"
-              data-brush="fill"
-              type="button"
-              role="radio"
-              aria-checked="false"
-            >
-              Fill Tool
-              <small>Drag a color onto the canvas to flood fill an area</small>
-            </button>
-            <button
-              class="brush-button"
-              data-brush="eraser"
-              type="button"
-              role="radio"
-              aria-checked="false"
-            >
-              Eraser
-              <small>Remove content with a soft erasure brush</small>
-            </button>
-          </div>
-        </div>
-
-        <div class="panel-group">
-          <h2>Brush Properties</h2>
-          <div class="slider-row">
-            <label for="sizeRange"
-              >Diameter <strong id="sizeValue">28</strong> px</label
-            >
-            <input id="sizeRange" type="range" min="1" max="100" value="28" />
-          </div>
-          <div class="slider-row">
-            <label for="opacityRange"
-              >Opacity <strong id="opacityValue">92</strong>%</label
-            >
-            <input
-              id="opacityRange"
-              type="range"
-              min="1"
-              max="100"
-              value="92"
-            />
-          </div>
-          <div class="slider-row">
-            <label for="colorPicker">
-              Brush Color <strong id="colorValue">#ffffff</strong>
-            </label>
-            <input id="colorPicker" type="color" value="#ffffff" />
-          </div>
-          <div class="color-palette" aria-label="Preset brush colors">
-            <button
-              class="color-swatch active"
-              type="button"
-              data-color="#ffffff"
-              style="background: #ffffff"
-            ></button>
-            <button
-              class="color-swatch"
-              type="button"
-              data-color="#7a5cff"
-              style="background: #7a5cff"
-            ></button>
-            <button
-              class="color-swatch"
-              type="button"
-              data-color="#44b2ff"
-              style="background: #44b2ff"
-            ></button>
-            <button
-              class="color-swatch"
-              type="button"
-              data-color="#ff5f7a"
-              style="background: #ff5f7a"
-            ></button>
-            <button
-              class="color-swatch"
-              type="button"
-              data-color="#4be8ac"
-              style="background: #4be8ac"
-            ></button>
-            <button
-              class="color-swatch"
-              type="button"
-              data-color="#ffd86d"
-              style="background: #ffd86d"
-            ></button>
-          </div>
-          <div class="slider-row">
-            <label for="opacityRange"
-              >Opacity <strong id="opacityValue">92</strong>%</label
-            >
-            <input
-              id="opacityRange"
-              type="range"
-              min="1"
-              max="100"
-              value="92"
-            />
-          </div>
-          <div class="status-row">
-            <span
-              >Current Brush:
-              <strong id="brushName">Technical Pen</strong></span
-            >
-            <span
-              >Frame Rate Target: <strong id="fpsValue">12</strong> FPS</span
-            >
-            <span>Frame Count: <strong id="frameCount">1</strong></span>
-          </div>
-        </div>
-
-        <div class="panel-group">
-          <h2>Playback Settings</h2>
-          <div class="slider-row">
-            <label for="fpsRange"
-              >Playback Speed <strong id="fpsDisplay">12</strong> FPS</label
-            >
-            <input id="fpsRange" type="range" min="1" max="60" value="12" />
-          </div>
-          <div class="slider-row">
-            <label for="onionOpacityRange"
-              >Onion Skin <strong id="onionOpacityValue">35</strong>%</label
-            >
-            <input
-              id="onionOpacityRange"
-              type="range"
-              min="0"
-              max="100"
-              value="35"
-            />
-          </div>
-        </div>
-      </aside>
+        <section>
+          <div id="homeProjects"></div>
+        </section>
+      </div>
     </main>
 
-    <footer>
-      <div class="timeline-shell">
-        <div class="timeline-controls">
-          <div class="timeline-buttons">
-            <button id="undoBtn" type="button" title="Undo">↶ Undo</button>
-            <button id="redoBtn" type="button" title="Redo">↷ Redo</button>
-            <button id="clearBtn" type="button">Clear Canvas</button>
-            <button id="playPauseBtn" class="primary" type="button">
-              ▶ Play
-            </button>
-            <button id="duplicateFrameBtn" type="button">⧉ Duplicate</button>
-            <button id="addFrameBtn" type="button">+ Keyframe</button>
-            <button id="removeFrameBtn" type="button">− Remove</button>
-          </div>
-          <div class="timeline-fps-controls">
-            <button id="fpsDownBtn" type="button">- FPS</button>
-            <input
-              id="timelinePlayback"
-              type="range"
-              min="1"
-              max="60"
-              value="12"
-              aria-label="Frame scrubber"
-            />
-            <button id="fpsUpBtn" type="button">+ FPS</button>
-          </div>
-          <div class="frame-actions">
-            <button id="prevFrameBtn" class="small" type="button">Prev</button>
-            <button id="nextFrameBtn" class="small" type="button">Next</button>
-          </div>
-        </div>
-        <div class="frame-sequence-header">
-          <h2>Keyframes</h2>
-          <span class="frame-note">Tap a thumbnail to select</span>
-        </div>
-        <div
-          id="frameDeck"
-          class="frame-deck"
-          aria-label="Keyframe sequence"
-        ></div>
-      </div>
-    </footer>
+    <script>
+      function renderHomeProjects() {
+        var list = document.getElementById("homeProjects");
+        list.innerHTML = "";
 
-    <script src="script.js"></script>
+        // Create new animation card
+        var newCard = document.createElement("div");
+        newCard.className = "project-card new-animation-card";
+        newCard.style.cursor = "pointer";
+        newCard.innerHTML =
+          '<div style="display: flex; align-items: center; justify-content: center; height: 100%; width: 100%; font-size: 200px; font-weight: 300; color: #999; line-height: 1;">+</div>';
+        newCard.addEventListener("click", function () {
+          localStorage.removeItem("mason_current");
+          location.href = "studio.html";
+        });
+        list.appendChild(newCard);
+
+        var ps = JSON.parse(localStorage.getItem("mason_projects") || "[]");
+        ps.forEach(function (p) {
+          var card = document.createElement("div");
+          card.className = "project-card";
+          var thumb = document.createElement("div");
+          thumb.className = "project-thumb";
+          if (p.thumb) {
+            var img = document.createElement("img");
+            img.src = p.thumb;
+            thumb.appendChild(img);
+          }
+          var titleWrap = document.createElement("div");
+          titleWrap.className = "project-info";
+          var title = document.createElement("h3");
+          title.textContent = p.name || "Animation " + p.id;
+          var created = document.createElement("small");
+          created.textContent = new Date(
+            p.created || Date.now(),
+          ).toLocaleString();
+          var open = document.createElement("button");
+          open.textContent = "Open";
+          open.addEventListener("click", function () {
+            localStorage.setItem("mason_current", p.id);
+            location.href = "studio.html";
+          });
+          var deleteBtn = document.createElement("button");
+          deleteBtn.textContent = "Delete";
+          deleteBtn.style.color = "#ff5f7a";
+          deleteBtn.addEventListener("click", function () {
+            if (confirm("Delete this animation?")) {
+              var ps = JSON.parse(
+                localStorage.getItem("mason_projects") || "[]",
+              );
+              ps = ps.filter(function (proj) {
+                return proj.id !== p.id;
+              });
+              localStorage.setItem("mason_projects", JSON.stringify(ps));
+              renderHomeProjects();
+            }
+          });
+          titleWrap.appendChild(title);
+          titleWrap.appendChild(created);
+          var actions = document.createElement("div");
+          actions.className = "project-actions";
+          actions.appendChild(open);
+          actions.appendChild(deleteBtn);
+          card.appendChild(thumb);
+          card.appendChild(titleWrap);
+          card.appendChild(actions);
+          list.appendChild(card);
+        });
+      }
+      renderHomeProjects();
+    </script>
   </body>
 </html>
