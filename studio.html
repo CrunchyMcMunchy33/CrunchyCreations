@@ -3,13 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Masonmation Studio</title>
+    <title>Crunchy Creations Studio</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
     <header>
       <div class="brand">
-        <h1>Masonmation Studio</h1>
+        <h1>Crunchy Creations Studio</h1>
         <span>Animation workspace</span>
       </div>
       <div class="metric" aria-live="polite">
@@ -26,9 +26,15 @@
       <section class="studio-panel" aria-label="Central drawing workspace">
         <div class="canvas-shell">
           <canvas
+            id="onionCanvas"
+            width="1920"
+            height="1080"
+            aria-hidden="true"
+          ></canvas>
+          <canvas
             id="studioCanvas"
-            width="1280"
-            height="720"
+            width="1920"
+            height="1080"
             aria-label="Animation canvas"
           ></canvas>
         </div>
@@ -186,15 +192,20 @@
               <input id="fpsRange" type="range" min="1" max="60" value="12" />
             </div>
             <div class="slider-row">
+              <label for="onionToggle">Onion Skin</label>
+              <input id="onionToggle" type="checkbox" checked />
+            </div>
+            <div class="slider-row">
               <label for="onionOpacityRange"
-                >Onion Skin <strong id="onionOpacityValue">35</strong>%</label
+                >Onion Opacity
+                <strong id="onionOpacityValue">40</strong>%</label
               >
               <input
                 id="onionOpacityRange"
                 type="range"
-                min="0"
+                min="10"
                 max="100"
-                value="35"
+                value="40"
               />
             </div>
           </div>
@@ -212,6 +223,7 @@
             <button id="playPauseBtn" class="primary" type="button">
               ▶ Play
             </button>
+            <button id="fullscreenBtn" type="button">Fullscreen</button>
             <button id="duplicateFrameBtn" type="button">⧉ Duplicate</button>
             <button id="addFrameBtn" type="button">+ Keyframe</button>
             <button id="removeFrameBtn" type="button">− Remove</button>

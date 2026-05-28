@@ -53,6 +53,11 @@ input[type=range], input[type=color] {
   outline: none;
 }
 
+input[type=checkbox] {
+  width: auto;
+  accent-color: var(--accent);
+}
+
 input[type=range] { accent-color: var(--accent); height: 20px; }
 label, .status-row span { display: flex; justify-content: space-between; gap: 12px; font-size: .95rem; color: var(--text); }
 .slider-row, .brand, .status-row { display: grid; gap: 10px; }
@@ -65,7 +70,7 @@ header, footer {
   align-items: center;
   justify-content: space-between;
   gap: 18px;
-  max-width: 1360px;
+  max-width: 1920px;
   margin: 0 auto;
 }
 
@@ -78,7 +83,7 @@ main {
   display: grid;
   grid-template-columns: 1.6fr .9fr;
   gap: 20px;
-  max-width: 1360px;
+  max-width: 1920px;
   margin: 24px auto 0;
 }
 
@@ -87,6 +92,8 @@ main {
   border: 1px solid var(--border);
   border-radius: 24px;
 }
+
+.timeline-shell { width: 100%; }
 
 
 /* 4. CANVAS REGION & CONTROL SIDEBAR */
@@ -102,7 +109,32 @@ main {
   place-items: center;
 }
 
-#studioCanvas, .frame-thumb canvas, .project-thumb img { width: 100%; height: 100%; display: block; background: #fff; }
+.canvas-shell { position: relative; }
+
+#onionCanvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  background: transparent;
+  z-index: 0;
+  pointer-events: none;
+}
+
+#studioCanvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  background: transparent;
+  z-index: 1;
+}
+
+.frame-thumb canvas, .project-thumb img { width: 100%; height: 100%; display: block; background: #fff; }
 aside { display: grid; gap: 18px; min-height: 640px; }
 .panel-group { padding: 0; display: block; }
 

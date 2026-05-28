@@ -1,6 +1,10 @@
 
 const canvas = document.getElementById('studioCanvas');
 const ctx = canvas.getContext('2d');
+
+const onionCanvas = document.getElementById('onionCanvas');
+const onionCtx = onionCanvas.getContext('2d');
+
 const fpsCounter = document.getElementById('fpsCounter');
 const playPauseBtn = document.getElementById('playPauseBtn');
 const undoBtn = document.getElementById('undoBtn');
@@ -15,8 +19,6 @@ const fpsRange = document.getElementById('fpsRange');
 const fpsDownBtn = document.getElementById('fpsDownBtn');
 const fpsUpBtn = document.getElementById('fpsUpBtn');
 const timelinePlayback = document.getElementById('timelinePlayback');
-const onionRange = document.getElementById('onionOpacityRange');
-const onionLabel = document.getElementById('onionOpacityValue');
 const sizeRange = document.getElementById('sizeRange');
 const opacityRange = document.getElementById('opacityRange');
 const colorPicker = document.getElementById('colorPicker');
@@ -26,6 +28,9 @@ const sizeLabel = document.getElementById('sizeValue');
 const opacityLabel = document.getElementById('opacityValue');
 const fpsLabel = document.getElementById('fpsValue');
 const fpsDisplay = document.getElementById('fpsDisplay');
+const onionToggle = document.getElementById('onionToggle');
+const onionOpacityRange = document.getElementById('onionOpacityRange');
+const onionOpacityLabel = document.getElementById('onionOpacityValue');
 const frameCount = document.getElementById('frameCount');
 const frameDeck = document.getElementById('frameDeck');
 const brushButtons = document.querySelectorAll('.brush-button');
@@ -33,128 +38,262 @@ const swatches = document.querySelectorAll('.color-swatch');
 const homeBtn = document.getElementById('homeBtn');
 const saveGalleryBtn = document.getElementById('saveGalleryBtn');
 const newAnimBtn = document.getElementById('newAnimBtn');
+const fullscreenBtn = document.getElementById('fullscreenBtn');
 
+// ====== APP SETTINGS AND STATE (SIMPLE, EXPLICIT) ======
+const BASE_WIDTH = 1920;
+const BASE_HEIGHT = 1080;
 
-// 2. APP SETTINGS AND STATE (MEMORY)
-
-const BASE_WIDTH = 1280;
-const BASE_HEIGHT = 720;
-let devicePixelRatio = window.devicePixelRatio || 1;
+let devicePixelRatio = window.devicePixelRatio;
+if (devicePixelRatio === undefined || devicePixelRatio === null) {
+  devicePixelRatio = 1;
+}
 
 let brushMode = 'technical';
 let brushSize = 28;
 let brushOpacity = 0.92;
 let brushColor = '#000000';
-let onionOpacity = 0.35;
+
+const ONION_OPACITY_DEFAULT = 0.4;
+let onionOpacity = ONION_OPACITY_DEFAULT;
+let onionEnabled = true;
 
 let timeline = [];
 let activeFrame = 0;
 let playing = false;
+
 let pointerDown = false;
 let lastPoint = null;
 
 let undoStack = [];
 let redoStack = [];
+
 let lastTime = 0;
 
+// We remove the dirty-rectangle optimization entirely.
 
 const thumbSource = document.createElement('canvas');
 thumbSource.width = BASE_WIDTH;
 thumbSource.height = BASE_HEIGHT;
 
+const onionSource = document.createElement('canvas');
+const onionSourceCtx = onionSource.getContext('2d');
+onionSource.width = BASE_WIDTH;
+onionSource.height = BASE_HEIGHT;
+
 let projects = [];
 let currentProjectId = null;
 
-
-// 3. INITIAL SETUP FUNCTIONS
-
+// ----------------------
+// Canvas setup
+// ----------------------
 function setupCanvas() {
-  canvas.width = BASE_WIDTH * devicePixelRatio;
-  canvas.height = BASE_HEIGHT * devicePixelRatio;
-  canvas.style.width = BASE_WIDTH + 'px';
-  canvas.style.height = BASE_HEIGHT + 'px';
-  
-  ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+  canvas.width = BASE_WIDTH;
+  canvas.height = BASE_HEIGHT;
+  canvas.style.width = '100%';
+  canvas.style.height = '100%';
+  canvas.style.position = 'absolute';
+  canvas.style.top = '0';
+  canvas.style.left = '0';
+  canvas.style.zIndex = '1';
+
+  if (canvas.parentElement) {
+    canvas.parentElement.style.position = 'relative';
+  }
+
+  onionCanvas.width = BASE_WIDTH;
+  onionCanvas.height = BASE_HEIGHT;
+  onionCanvas.style.width = '100%';
+  onionCanvas.style.height = '100%';
+  onionCanvas.style.position = 'absolute';
+  onionCanvas.style.top = '0';
+  onionCanvas.style.left = '0';
+  onionCanvas.style.zIndex = '0';
+  onionCanvas.style.pointerEvents = 'none';
+
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
+
   clearCanvas(false);
 }
 
+// ----------------------
+// Event binding (explicit handlers)
+// ----------------------
 function bindEvents() {
   canvas.addEventListener('pointerdown', onPointerDown);
-  canvas.addEventListener('dragover', (e) => e.preventDefault());
+
+  canvas.addEventListener('dragover', function(e) {
+    e.preventDefault();
+  });
   canvas.addEventListener('drop', onCanvasDrop);
-  
+
   window.addEventListener('pointermove', onPointerMove);
   window.addEventListener('pointerup', onPointerUp);
-  
-  playPauseBtn.addEventListener('click', () => setPlayback(!playing));
+
+  playPauseBtn.addEventListener('click', function() {
+    setPlayback(!playing);
+  });
+
   undoBtn.addEventListener('click', undo);
   redoBtn.addEventListener('click', redo);
-  clearBtn.addEventListener('click', () => clearCanvas(true));
+
+  clearBtn.addEventListener('click', function() {
+    clearCanvas(true);
+  });
   addFrameBtn.addEventListener('click', addBlankFrame);
   removeFrameBtn.addEventListener('click', removeCurrentFrame);
   duplicateFrameBtn.addEventListener('click', duplicateFrame);
-  
-  prevFrameBtn.addEventListener('click', () => selectFrame(activeFrame - 1));
-  nextFrameBtn.addEventListener('click', () => selectFrame(activeFrame + 1));
-  
-  fpsRange.addEventListener('input', (e) => syncFPS(Number(e.target.value)));
-  timelinePlayback.addEventListener('input', (e) => syncFPS(Number(e.target.value)));
-  
-  fpsDownBtn.addEventListener('click', () => syncFPS(Math.max(1, Number(fpsRange.value) - 1)));
-  fpsUpBtn.addEventListener('click', () => syncFPS(Math.min(60, Number(fpsRange.value) + 1)));
-  onionRange.addEventListener('input', (e) => syncOnion(Number(e.target.value)));
-  
-  sizeRange.addEventListener('input', (e) => { 
-    brushSize = Number(e.target.value) || 1; 
-    sizeLabel.textContent = brushSize; 
+
+  if (fullscreenBtn) {
+    fullscreenBtn.addEventListener('click', toggleCanvasFullscreen);
+  }
+
+  prevFrameBtn.addEventListener('click', function() {
+    selectFrame(activeFrame - 1);
   });
-  
-  opacityRange.addEventListener('input', (e) => { 
-    brushOpacity = (Number(e.target.value) || 1) / 100; 
-    opacityLabel.textContent = Math.round(brushOpacity * 100); 
+  nextFrameBtn.addEventListener('click', function() {
+    selectFrame(activeFrame + 1);
   });
-  
-  colorPicker.addEventListener('input', (e) => setColor(e.target.value));
+
+  fpsRange.addEventListener('input', function(e) {
+    syncFPS(Number(e.target.value));
+  });
+  timelinePlayback.addEventListener('input', function(e) {
+    syncFPS(Number(e.target.value));
+  });
+
+  onionToggle.addEventListener('change', function(e) {
+    setOnionSkin(e.target.checked);
+  });
+  onionOpacityRange.addEventListener('input', function(e) {
+    setOnionOpacity(Number(e.target.value) / 100);
+  });
+
+  fpsDownBtn.addEventListener('click', function() {
+    var v = Number(fpsRange.value) - 1;
+    if (v < 1) v = 1;
+    syncFPS(v);
+  });
+  fpsUpBtn.addEventListener('click', function() {
+    var v = Number(fpsRange.value) + 1;
+    if (v > 60) v = 60;
+    syncFPS(v);
+  });
+
+  sizeRange.addEventListener('input', function(e) {
+    brushSize = Number(e.target.value);
+    if (!brushSize || brushSize < 1) brushSize = 1;
+    sizeLabel.textContent = brushSize;
+  });
+
+  opacityRange.addEventListener('input', function(e) {
+    var v = Number(e.target.value);
+    if (!v) v = 100;
+    brushOpacity = v / 100;
+    opacityLabel.textContent = Math.round(brushOpacity * 100);
+  });
+
+  colorPicker.addEventListener('input', function(e) {
+    setColor(e.target.value);
+  });
+
   frameDeck.addEventListener('click', onFrameDeckClick);
-  
-  brushButtons.forEach(btn => btn.addEventListener('click', onBrushSelect));
-  
-  swatches.forEach(swatch => {
-    swatch.draggable = true;
-    swatch.addEventListener('click', onSwatchClick);
-    swatch.addEventListener('dragstart', onColorDragStart);
-    swatch.addEventListener('dragend', onColorDragEnd);
-  });
-  
-  if (homeBtn) homeBtn.addEventListener('click', () => location.href = 'index.html');
-  if (saveGalleryBtn) saveGalleryBtn.addEventListener('click', saveToGallery);
-  if (newAnimBtn) newAnimBtn.addEventListener('click', createMultiplePrompt);
+
+  for (var i = 0; i < brushButtons.length; i++) {
+    var btn = brushButtons[i];
+    btn.addEventListener('click', onBrushSelect);
+  }
+
+  for (var j = 0; j < swatches.length; j++) {
+    var sw = swatches[j];
+    sw.draggable = true;
+    sw.addEventListener('click', onSwatchClick);
+    sw.addEventListener('dragstart', onColorDragStart);
+    sw.addEventListener('dragend', onColorDragEnd);
+  }
+
+  if (homeBtn) {
+    homeBtn.addEventListener('click', function() {
+      location.href = 'index.html';
+    });
+  }
+
+  if (saveGalleryBtn) {
+    saveGalleryBtn.addEventListener('click', saveToGallery);
+  }
+
+  if (newAnimBtn) {
+    newAnimBtn.addEventListener('click', createMultiplePrompt);
+  }
+
+  document.addEventListener('fullscreenchange', updateFullscreenButton);
+  document.addEventListener('webkitfullscreenchange', updateFullscreenButton);
+  document.addEventListener('mozfullscreenchange', updateFullscreenButton);
+  document.addEventListener('MSFullscreenChange', updateFullscreenButton);
+
+  window.addEventListener('keydown', onGlobalShortcut);
 }
 
-
-// 4. SAVE & LOAD SYSTEM (LOCAL STORAGE)
-
+// ----------------------
+// Save / Load from localStorage (simple, safe)
+// ----------------------
 function loadProjects() {
-  try { 
-    projects = JSON.parse(localStorage.getItem('mason_projects') || '[]'); 
-  } catch (e) { 
-    projects = []; 
+  var raw = null;
+  try {
+    raw = localStorage.getItem('mason_projects');
+  } catch (e) {
+    raw = null;
   }
-  currentProjectId = localStorage.getItem('mason_current') || null;
+
+  if (raw) {
+    try {
+      projects = JSON.parse(raw);
+    } catch (err) {
+      projects = [];
+    }
+  } else {
+    projects = [];
+  }
+
+  var cur = null;
+  try {
+    cur = localStorage.getItem('mason_current');
+  } catch (e) {
+    cur = null;
+  }
+
+  if (cur) {
+    currentProjectId = cur;
+  } else {
+    currentProjectId = null;
+  }
 }
 
 function saveProjects() {
-  localStorage.setItem('mason_projects', JSON.stringify(projects));
+  try {
+    localStorage.setItem('mason_projects', JSON.stringify(projects));
+  } catch (e) {
+    // ignore storage errors for simplicity
+  }
+
   if (currentProjectId) {
-    localStorage.setItem('mason_current', currentProjectId);
+    try {
+      localStorage.setItem('mason_current', currentProjectId);
+    } catch (e) {
+      // ignore
+    }
   }
 }
 
 function saveToGallery() {
-  let project = {
-    id: currentProjectId || Date.now().toString(),
+  var pid = currentProjectId;
+  if (!pid) {
+    pid = Date.now().toString();
+  }
+
+  var project = {
+    id: pid,
     name: 'Animation ' + Date.now(),
     created: Date.now(),
     fps: Number(fpsRange.value) || 12,
@@ -162,27 +301,43 @@ function saveToGallery() {
     thumb: null
   };
 
-  let tctx = thumbSource.getContext('2d');
-  let tmp = document.createElement('canvas');
+  var tctx = thumbSource.getContext('2d');
+  var tmp = document.createElement('canvas');
   tmp.width = 640;
   tmp.height = 360;
-  let t2 = tmp.getContext('2d');
+  var t2 = tmp.getContext('2d');
 
-  for (let i = 0; i < timeline.length; i++) {
-    tctx.putImageData(timeline[i].imageData, 0, 0);
-    t2.clearRect(0, 0, tmp.width, tmp.height);
-    t2.drawImage(thumbSource, 0, 0, tmp.width, tmp.height);
-    project.frames.push(tmp.toDataURL('image/png'));
-    if (!project.thumb) project.thumb = tmp.toDataURL('image/png');
+  for (var i = 0; i < timeline.length; i++) {
+    var frame = timeline[i];
+    if (frame && frame.imageData) {
+      tctx.clearRect(0, 0, thumbSource.width, thumbSource.height);
+      tctx.putImageData(frame.imageData, 0, 0);
+      t2.clearRect(0, 0, tmp.width, tmp.height);
+      t2.drawImage(thumbSource, 0, 0, tmp.width, tmp.height);
+      var dataUrl = tmp.toDataURL('image/png');
+      project.frames.push(dataUrl);
+      if (!project.thumb) {
+        project.thumb = dataUrl;
+      }
+    } else {
+      project.frames.push('');
+    }
   }
 
-  let existing = projects.find(p => p.id === project.id);
-  if (existing) {
-    existing.name = project.name;
-    existing.created = project.created;
-    existing.fps = project.fps;
-    existing.frames = project.frames;
-    existing.thumb = project.thumb;
+  var foundIndex = -1;
+  for (var k = 0; k < projects.length; k++) {
+    if (projects[k].id === project.id) {
+      foundIndex = k;
+      break;
+    }
+  }
+
+  if (foundIndex >= 0) {
+    projects[foundIndex].name = project.name;
+    projects[foundIndex].created = project.created;
+    projects[foundIndex].fps = project.fps;
+    projects[foundIndex].frames = project.frames;
+    projects[foundIndex].thumb = project.thumb;
   } else {
     projects.unshift(project);
   }
@@ -193,36 +348,54 @@ function saveToGallery() {
 }
 
 function loadProject(id) {
-  let project = projects.find(p => p.id === id);
-  if (!project) return;
+  var project = null;
+  for (var i = 0; i < projects.length; i++) {
+    if (projects[i].id === id) {
+      project = projects[i];
+      break;
+    }
+  }
 
-  let tmp = document.createElement('canvas');
+  if (!project) {
+    return;
+  }
+
+  var tmp = document.createElement('canvas');
   tmp.width = BASE_WIDTH;
   tmp.height = BASE_HEIGHT;
-  let t2 = tmp.getContext('2d');
-  
-  timeline = [];
-  let framesLoaded = 0;
-  let totalFrames = project.frames.length;
+  var t2 = tmp.getContext('2d');
 
-  project.frames.forEach((frameData, index) => {
-    let img = new Image();
-    img.onload = function() {
-      try {
-        t2.clearRect(0, 0, tmp.width, tmp.height);
-        t2.drawImage(img, 0, 0, tmp.width, tmp.height);
-        timeline[index] = { imageData: t2.getImageData(0, 0, BASE_WIDTH, BASE_HEIGHT) };
-      } catch (e) {
-        timeline[index] = { imageData: ctx.createImageData(BASE_WIDTH, BASE_HEIGHT) };
-      }
-      
-      framesLoaded++;
-      if (framesLoaded === totalFrames) {
-        finishLoadingProject(id);
-      }
-    };
-    img.src = frameData;
-  });
+  timeline = [];
+  var framesLoaded = 0;
+  var totalFrames = project.frames.length;
+
+  if (totalFrames === 0) {
+    finishLoadingProject(id);
+    return;
+  }
+
+  for (var j = 0; j < project.frames.length; j++) {
+    (function(index) {
+      var frameData = project.frames[index];
+      var img = new Image();
+      img.onload = function() {
+        try {
+          t2.clearRect(0, 0, tmp.width, tmp.height);
+          t2.drawImage(img, 0, 0, tmp.width, tmp.height);
+          var imageData = t2.getImageData(0, 0, BASE_WIDTH, BASE_HEIGHT);
+          timeline[index] = { imageData: imageData };
+        } catch (err) {
+          timeline[index] = { imageData: ctx.createImageData(BASE_WIDTH, BASE_HEIGHT) };
+        }
+
+        framesLoaded = framesLoaded + 1;
+        if (framesLoaded === totalFrames) {
+          finishLoadingProject(id);
+        }
+      };
+      img.src = frameData;
+    })(j);
+  }
 }
 
 function finishLoadingProject(id) {
@@ -234,122 +407,307 @@ function finishLoadingProject(id) {
 }
 
 function createNewProject(name) {
-  timeline = [{ imageData: ctx.createImageData(BASE_WIDTH, BASE_HEIGHT) }];
+  timeline = [];
+  var blank = ctx.createImageData(BASE_WIDTH, BASE_HEIGHT);
+  timeline.push({ imageData: blank });
   activeFrame = 0;
   restoreFrame();
   renderTimeline();
+
   currentProjectId = Date.now().toString();
-  projects.unshift({
+  var project = {
     id: currentProjectId,
     name: name || ('Animation ' + currentProjectId),
     created: Date.now(),
     fps: Number(fpsRange.value) || 12,
     frames: []
-  });
+  };
+  projects.unshift(project);
   saveProjects();
 }
 
 function createMultiplePrompt() {
-  let count = parseInt(prompt('How many new animations?', '3'), 10) || 0;
-  for (let i = 0; i < count; i++) {
+  var raw = prompt('How many new animations?', '3');
+  var count = parseInt(raw, 10);
+  if (!count || count < 1) {
+    count = 0;
+  }
+
+  for (var i = 0; i < count; i++) {
     createNewProject('Animation ' + (Date.now() + i));
   }
-  if (count > 0) alert('Created ' + count + ' animations');
+
+  if (count > 0) {
+    alert('Created ' + count + ' animations');
+  }
 }
 
-// 5. BRUSH & COLOR CONTROLS
-
+// ----------------------
+// Brush and color controls
+// ----------------------
 function onBrushSelect(e) {
-  brushMode = e.currentTarget.dataset.brush || 'technical';
-  brushName.textContent = e.currentTarget.textContent.trim().split('\n')[0];
-  
-  brushButtons.forEach(btn => {
-    let isActive = btn.dataset.brush === brushMode;
-    btn.classList.toggle('active', isActive);
-    btn.setAttribute('aria-checked', isActive);
-  });
+  var ds = e.currentTarget.dataset.brush;
+  if (!ds) {
+    brushMode = 'technical';
+  } else {
+    brushMode = ds;
+  }
+
+  var t = e.currentTarget.textContent;
+  if (t) {
+    t = t.trim();
+    var parts = t.split('\n');
+    brushName.textContent = parts[0];
+  }
+
+  for (var i = 0; i < brushButtons.length; i++) {
+    var btn = brushButtons[i];
+    var active = false;
+    if (btn.dataset.brush === brushMode) {
+      active = true;
+    }
+    if (active) {
+      btn.classList.add('active');
+      btn.setAttribute('aria-checked', 'true');
+    } else {
+      btn.classList.remove('active');
+      btn.setAttribute('aria-checked', 'false');
+    }
+  }
 }
 
-function setColor(hex) { 
-  brushColor = hex; 
-  colorPicker.value = hex; 
-  colorLabel.textContent = hex; 
-  updateSwatches(); 
+function setColor(hex) {
+  brushColor = hex;
+  colorPicker.value = hex;
+  colorLabel.textContent = hex;
+  updateSwatches();
 }
 
-function onSwatchClick(e) { 
-  setColor(e.currentTarget.dataset.color); 
+function setOnionSkin(enabled) {
+  if (enabled) {
+    onionEnabled = true;
+  } else {
+    onionEnabled = false;
+  }
+  if (onionToggle) {
+    onionToggle.checked = onionEnabled;
+  }
+  restoreFrame();
 }
 
-function onColorDragStart(e) { 
-  e.dataTransfer.setData('text/plain', e.currentTarget.dataset.color); 
-  e.dataTransfer.effectAllowed = 'copy'; 
-  e.currentTarget.classList.add('dragging'); 
+function setOnionOpacity(value) {
+  var v = value;
+  if (v < 0.1) v = 0.1;
+  if (v > 1) v = 1;
+  onionOpacity = v;
+  if (onionOpacityLabel) {
+    onionOpacityLabel.textContent = Math.round(onionOpacity * 100);
+  }
+  restoreFrame();
 }
 
-
-function onColorDragEnd(e) { 
-  e.currentTarget.classList.remove('dragging'); 
+function onSwatchClick(e) {
+  var c = e.currentTarget.dataset.color;
+  setColor(c);
 }
 
-function updateSwatches() { 
-  swatches.forEach(swatch => {
-    swatch.classList.toggle('active', swatch.dataset.color === brushColor);
-  });
+function onColorDragStart(e) {
+  var c = e.currentTarget.dataset.color;
+  try {
+    e.dataTransfer.setData('text/plain', c);
+    e.dataTransfer.effectAllowed = 'copy';
+  } catch (err) {
+    // ignore
+  }
+  e.currentTarget.classList.add('dragging');
 }
 
-function onCanvasDrop(e) { 
-  e.preventDefault(); 
-  let color = e.dataTransfer.getData('text/plain'); 
-  if (!color) return; 
-  saveUndoState(); 
-  fillArea(getPointFromEvent(e), color); 
-  commitFrame(); 
+function onColorDragEnd(e) {
+  e.currentTarget.classList.remove('dragging');
 }
 
-function syncFPS(v) { 
-  let f = Math.max(1, Math.min(60, v || 12)); 
-  fpsRange.value = f; 
-  timelinePlayback.value = f; 
-  fpsLabel.textContent = f; 
-  fpsDisplay.textContent = f; 
+function updateSwatches() {
+  for (var i = 0; i < swatches.length; i++) {
+    var sw = swatches[i];
+    if (sw.dataset.color === brushColor) {
+      sw.classList.add('active');
+    } else {
+      sw.classList.remove('active');
+    }
+  }
 }
 
-function syncOnion(v) { 
-  onionOpacity = (v || 0) / 100; 
-  onionLabel.textContent = v || 0; 
-  restoreFrame(); 
+function onGlobalShortcut(e) {
+  var target = e.target;
+  if (target) {
+    var tag = target.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || target.isContentEditable) {
+      return;
+    }
+  }
+
+  if (e.key === 'f' || e.key === 'F') {
+    e.preventDefault();
+    toggleCanvasFullscreen();
+    return;
+  }
+
+  if (e.key === 'ArrowRight') {
+    e.preventDefault();
+    selectFrame(activeFrame + 1);
+    return;
+  }
+
+  if (e.key === 'ArrowLeft') {
+    e.preventDefault();
+    selectFrame(activeFrame - 1);
+    return;
+  }
 }
 
-function getPointFromEvent(e) { 
-  let r = canvas.getBoundingClientRect(); 
-  return { 
-    x: ((e.clientX - r.left) * BASE_WIDTH) / r.width, 
-    y: ((e.clientY - r.top) * BASE_HEIGHT) / r.height 
-  }; 
+function toggleCanvasFullscreen() {
+  var current = document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement;
+  if (current) {
+    exitFullscreen();
+    return;
+  }
+
+  var target = canvas.parentElement || canvas;
+  if (target.requestFullscreen) {
+    target.requestFullscreen();
+  } else if (target.webkitRequestFullscreen) {
+    target.webkitRequestFullscreen();
+  } else if (target.mozRequestFullScreen) {
+    target.mozRequestFullScreen();
+  } else if (target.msRequestFullscreen) {
+    target.msRequestFullscreen();
+  }
 }
 
+function exitFullscreen() {
+  if (document.exitFullscreen) {
+    document.exitFullscreen();
+  } else if (document.webkitExitFullscreen) {
+    document.webkitExitFullscreen();
+  } else if (document.mozCancelFullScreen) {
+    document.mozCancelFullScreen();
+  } else if (document.msExitFullscreen) {
+    document.msExitFullscreen();
+  }
+}
 
-// 6. UNDO, REDO, & TIMELINE MANAGEMENT
+function updateFullscreenButton() {
+  var current = document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement;
+  if (!fullscreenBtn) return;
+  if (current) {
+    fullscreenBtn.textContent = 'Exit Fullscreen';
+  } else {
+    fullscreenBtn.textContent = 'Fullscreen';
+  }
+}
+
+function onCanvasDrop(e) {
+  e.preventDefault();
+  var color = '';
+  try {
+    color = e.dataTransfer.getData('text/plain');
+  } catch (err) {
+    color = '';
+  }
+
+  if (!color) {
+    return;
+  }
+
+  saveUndoState();
+  fillArea(getPointFromEvent(e), color);
+  commitFrame();
+}
+
+function syncFPS(v) {
+  var f = v;
+  if (!f || isNaN(f)) {
+    f = 12;
+  }
+  if (f < 1) f = 1;
+  if (f > 60) f = 60;
+
+  fpsRange.value = f;
+  timelinePlayback.value = f;
+  fpsLabel.textContent = f;
+  fpsDisplay.textContent = f;
+}
+
+function getPointFromEvent(e) {
+  var r = canvas.getBoundingClientRect();
+  var x = e.clientX - r.left;
+  var y = e.clientY - r.top;
+  var scaledX = (x * BASE_WIDTH) / r.width;
+  var scaledY = (y * BASE_HEIGHT) / r.height;
+  return { x: scaledX, y: scaledY };
+}
+
+// ----------------------
+// UNDO, REDO, & TIMELINE MANAGEMENT (simple full-frame copies)
+// ----------------------
+function cloneImageData(imageData) {
+  var w = imageData.width;
+  var h = imageData.height;
+  var src = imageData.data;
+  var dst = new Uint8ClampedArray(w * h * 4);
+  for (var i = 0; i < dst.length; i++) {
+    dst[i] = src[i];
+  }
+  return new ImageData(dst, w, h);
+}
 
 function saveUndoState() {
-  undoStack.push({ frame: activeFrame, imageData: ctx.getImageData(0, 0, BASE_WIDTH, BASE_HEIGHT) });
+  var currentData = null;
+  if (timeline[activeFrame] && timeline[activeFrame].imageData) {
+    currentData = cloneImageData(timeline[activeFrame].imageData);
+  } else {
+    currentData = ctx.getImageData(0, 0, BASE_WIDTH, BASE_HEIGHT);
+  }
+
+  undoStack.push({ frame: activeFrame, imageData: currentData });
   redoStack = [];
 }
 
 function undo() {
-  if (undoStack.length === 0) return;
-  redoStack.push({ frame: activeFrame, imageData: ctx.getImageData(0, 0, BASE_WIDTH, BASE_HEIGHT) });
-  let state = undoStack.pop();
+  if (undoStack.length === 0) {
+    return;
+  }
+
+  var currentData = null;
+  if (timeline[activeFrame] && timeline[activeFrame].imageData) {
+    currentData = cloneImageData(timeline[activeFrame].imageData);
+  } else {
+    currentData = ctx.getImageData(0, 0, BASE_WIDTH, BASE_HEIGHT);
+  }
+
+  redoStack.push({ frame: activeFrame, imageData: currentData });
+
+  var state = undoStack.pop();
   activeFrame = state.frame;
   ctx.putImageData(state.imageData, 0, 0);
   commitFrame();
 }
 
 function redo() {
-  if (redoStack.length === 0) return;
-  undoStack.push({ frame: activeFrame, imageData: ctx.getImageData(0, 0, BASE_WIDTH, BASE_HEIGHT) });
-  let state = redoStack.pop();
+  if (redoStack.length === 0) {
+    return;
+  }
+
+  var currentData = null;
+  if (timeline[activeFrame] && timeline[activeFrame].imageData) {
+    currentData = cloneImageData(timeline[activeFrame].imageData);
+  } else {
+    currentData = ctx.getImageData(0, 0, BASE_WIDTH, BASE_HEIGHT);
+  }
+
+  undoStack.push({ frame: activeFrame, imageData: currentData });
+
+  var state = redoStack.pop();
   activeFrame = state.frame;
   ctx.putImageData(state.imageData, 0, 0);
   commitFrame();
@@ -357,53 +715,73 @@ function redo() {
 
 function clearCanvas(save) {
   ctx.clearRect(0, 0, BASE_WIDTH, BASE_HEIGHT);
-  if (save) { saveUndoState(); commitFrame(); }
+  if (save) {
+    saveUndoState();
+    commitFrame();
+  }
 }
 
+// Commit the entire canvas as the frame image. No dirty rects.
 function commitFrame() {
-  timeline[activeFrame] = { imageData: ctx.getImageData(0, 0, BASE_WIDTH, BASE_HEIGHT) };
+  var displayImage = ctx.getImageData(0, 0, BASE_WIDTH, BASE_HEIGHT);
+  var copy = cloneImageData(displayImage);
+
+  timeline[activeFrame] = { imageData: copy };
   renderTimeline();
 }
 
 function restoreFrame() {
-  let frame = timeline[activeFrame];
-  if (!frame) return;
+  var frame = timeline[activeFrame];
+  if (!frame) {
+    return;
+  }
+
+  onionCtx.clearRect(0, 0, BASE_WIDTH, BASE_HEIGHT);
   ctx.clearRect(0, 0, BASE_WIDTH, BASE_HEIGHT);
 
-  if (onionOpacity > 0) {
-    ctx.save();
-    ctx.globalAlpha = onionOpacity;
-    if (activeFrame > 0 && timeline[activeFrame - 1]) {
-      ctx.putImageData(timeline[activeFrame - 1].imageData, 0, 0);
+  if (!playing && onionEnabled && activeFrame > 0) {
+    var previous = timeline[activeFrame - 1];
+    if (previous && previous.imageData) {
+      onionSourceCtx.clearRect(0, 0, BASE_WIDTH, BASE_HEIGHT);
+      onionSourceCtx.putImageData(previous.imageData, 0, 0);
+
+      onionCtx.save();
+      onionCtx.globalAlpha = onionOpacity;
+      onionCtx.drawImage(onionSource, 0, 0);
+      onionCtx.restore();
     }
-    if (activeFrame < timeline.length - 1 && timeline[activeFrame + 1]) {
-      ctx.putImageData(timeline[activeFrame + 1].imageData, 0, 0);
-    }
-    ctx.restore();
   }
-  ctx.putImageData(frame.imageData, 0, 0);
+
+  if (frame.imageData) {
+    ctx.putImageData(frame.imageData, 0, 0);
+  }
 }
 
 function addBlankFrame() {
-  timeline.splice(activeFrame + 1, 0, { imageData: ctx.createImageData(BASE_WIDTH, BASE_HEIGHT) });
-  activeFrame++;
+  var blank = ctx.createImageData(BASE_WIDTH, BASE_HEIGHT);
+  timeline.splice(activeFrame + 1, 0, { imageData: blank });
+  activeFrame = activeFrame + 1;
   restoreFrame();
   renderTimeline();
 }
 
 function duplicateFrame() {
-  let frame = timeline[activeFrame];
-  if (!frame) return;
-  let copy = ctx.createImageData(frame.imageData.width, frame.imageData.height);
-  copy.data.set(new Uint8ClampedArray(frame.imageData.data));
+  var frame = timeline[activeFrame];
+  if (!frame || !frame.imageData) {
+    return;
+  }
+
+  var copy = cloneImageData(frame.imageData);
   timeline.splice(activeFrame + 1, 0, { imageData: copy });
-  activeFrame++;
+  activeFrame = activeFrame + 1;
   restoreFrame();
   renderTimeline();
 }
 
 function removeCurrentFrame() {
-  if (timeline.length <= 1) return;
+  if (timeline.length <= 1) {
+    return;
+  }
   timeline.splice(activeFrame, 1);
   activeFrame = Math.max(0, activeFrame - 1);
   restoreFrame();
@@ -411,50 +789,61 @@ function removeCurrentFrame() {
 }
 
 function selectFrame(index) {
-  index = Math.max(0, Math.min(timeline.length - 1, index));
-  if (index === activeFrame) return;
+  if (index < 0) index = 0;
+  if (index > timeline.length - 1) index = timeline.length - 1;
+  if (index === activeFrame) {
+    return;
+  }
   commitFrame();
   activeFrame = index;
   restoreFrame();
   renderTimeline();
 }
 
-
-// 7. PLAYBACK LOOP ENGINE
-
+// ----------------------
+// Playback controls
+// ----------------------
 function setPlayback(on) {
-  playing = on;
-  playPauseBtn.textContent = playing ? 'Pause' : 'Play';
-  if (playing) { 
-    lastTime = performance.now(); 
-  } else { 
-    commitFrame(); 
+  if (on) {
+    playing = true;
+    playPauseBtn.textContent = 'Pause';
+    lastTime = performance.now();
+    restoreFrame();
+  } else {
+    playing = false;
+    playPauseBtn.textContent = 'Play';
+    commitFrame();
+    restoreFrame();
   }
 }
 
 function loop(timestamp) {
-  let delta = timestamp - lastTime;
-  fpsCounter.textContent = 'FPS ' + Math.round(1000 / Math.max(delta, 1));
+  var delta = timestamp - lastTime;
+  if (delta <= 0) delta = 1;
+  var fpsValue = Math.round(1000 / delta);
+  fpsCounter.textContent = 'FPS ' + fpsValue;
 
   if (playing) {
-    let targetInterval = 1000 / Number(fpsRange.value); 
-    
+    var targetInterval = 1000 / Number(fpsRange.value);
     if (delta >= targetInterval) {
-      lastTime = timestamp; 
-      activeFrame = (activeFrame + 1) % timeline.length; 
+      lastTime = timestamp;
+      activeFrame = activeFrame + 1;
+      if (activeFrame >= timeline.length) {
+        activeFrame = 0;
+      }
       restoreFrame();
       renderTimeline();
     }
   } else {
     lastTime = timestamp;
   }
-  
+
   requestAnimationFrame(loop);
 }
 
-
-// 8. CANVAS DRAWING MECHANICS
-
+// ----------------------
+// Drawing primitives
+// ----------------------
 function drawDot(point, isDown) {
   if (brushMode === 'eraser') {
     ctx.save();
@@ -466,9 +855,10 @@ function drawDot(point, isDown) {
     ctx.restore();
     return;
   }
+
   if (brushMode === 'airbrush') {
-    let r = brushSize * 0.75;
-    let g = ctx.createRadialGradient(point.x, point.y, r * 0.05, point.x, point.y, r);
+    var r = brushSize * 0.75;
+    var g = ctx.createRadialGradient(point.x, point.y, r * 0.05, point.x, point.y, r);
     g.addColorStop(0, hexToRgba(brushColor, brushOpacity));
     g.addColorStop(0.6, hexToRgba(brushColor, brushOpacity * 0.35));
     g.addColorStop(1, hexToRgba(brushColor, 0));
@@ -480,33 +870,41 @@ function drawDot(point, isDown) {
     ctx.restore();
     return;
   }
+
   if (brushMode === 'pencil') {
     ctx.save();
     ctx.strokeStyle = brushColor;
     ctx.lineWidth = brushSize * 0.55;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    ctx.globalAlpha = Math.max(0.12, brushOpacity * 0.28);
-    
-    for (let i = 0; i < 4; i++) {
-      let jit = brushSize * 0.35;
-      let x = point.x + (Math.random() - 0.5) * jit;
-      let y = point.y + (Math.random() - 0.5) * jit;
+    var alpha = brushOpacity * 0.28;
+    if (alpha < 0.12) alpha = 0.12;
+    ctx.globalAlpha = alpha;
+
+    for (var i = 0; i < 4; i++) {
+      var jit = brushSize * 0.35;
+      var rx = Math.random() - 0.5;
+      var ry = Math.random() - 0.5;
+      var x = point.x + rx * jit;
+      var y = point.y + ry * jit;
       ctx.beginPath();
       ctx.moveTo(x, y);
       ctx.lineTo(x + 0.1, y + 0.1);
       ctx.stroke();
     }
+
     if (isDown) {
-      ctx.globalAlpha *= 0.5;
+      ctx.globalAlpha = ctx.globalAlpha * 0.5;
       ctx.fillStyle = brushColor;
       ctx.beginPath();
       ctx.arc(point.x, point.y, brushSize * 0.35, 0, Math.PI * 2);
       ctx.fill();
     }
+
     ctx.restore();
     return;
   }
+
   ctx.save();
   ctx.globalAlpha = brushOpacity;
   ctx.fillStyle = brushColor;
@@ -517,182 +915,264 @@ function drawDot(point, isDown) {
 }
 
 function drawLine(start, end) {
-  let dx = end.x - start.x;
-  let dy = end.y - start.y;
-  let dist = Math.sqrt(dx * dx + dy * dy);
-  let steps = Math.max(2, Math.ceil(dist / 2));
-  for (let i = 0; i <= steps; i++) {
-    drawDot({ x: start.x + (dx / steps) * i, y: start.y + (dy / steps) * i }, false);
+  var dx = end.x - start.x;
+  var dy = end.y - start.y;
+  var dist = Math.sqrt(dx * dx + dy * dy);
+  var steps = Math.ceil(dist / 2);
+  if (steps < 2) steps = 2;
+
+  for (var i = 0; i <= steps; i++) {
+    var t = i / steps;
+    var x = start.x + dx * t;
+    var y = start.y + dy * t;
+    drawDot({ x: x, y: y }, false);
   }
 }
 
 function fillArea(point, fillColor) {
-  let imageData = ctx.getImageData(0, 0, BASE_WIDTH, BASE_HEIGHT);
-  let pixels = imageData.data;
-  let x = Math.floor(point.x);
-  let y = Math.floor(point.y);
-  let width = BASE_WIDTH;
-  let idx = (y * width + x) * 4;
-  
-  let tr = pixels[idx];
-  let tg = pixels[idx + 1];
-  let tb = pixels[idx + 2];
-  let ta = pixels[idx + 3];
-  
-  let fill = hexToRgbaArray(fillColor);
-  if (tr === fill[0] && tg === fill[1] && tb === fill[2] && ta === fill[3]) return;
-  
-  let stack = [x, y];
-  while (stack.length > 0) {
-    y = stack.pop();
-    x = stack.pop();
-    if (x < 0 || x >= width || y < 0 || y >= BASE_HEIGHT) continue;
-    idx = (y * width + x) * 4;
-    if (pixels[idx] !== tr || pixels[idx + 1] !== tg || pixels[idx + 2] !== tb || pixels[idx + 3] !== ta) continue;
-    
-    pixels[idx] = fill[0];
-    pixels[idx + 1] = fill[1];
-    pixels[idx + 2] = fill[2];
-    pixels[idx + 3] = fill[3];
-    
-    stack.push(x + 1, y, x - 1, y, x, y + 1, x, y - 1);
+  var imageData = null;
+  if (timeline[activeFrame] && timeline[activeFrame].imageData) {
+    imageData = cloneImageData(timeline[activeFrame].imageData);
+  } else {
+    imageData = ctx.createImageData(BASE_WIDTH, BASE_HEIGHT);
   }
+
+  var pixels = imageData.data;
+  var x = Math.floor(point.x);
+  var y = Math.floor(point.y);
+  var width = BASE_WIDTH;
+
+  if (x < 0 || x >= width || y < 0 || y >= BASE_HEIGHT) {
+    return;
+  }
+
+  var idx = (y * width + x) * 4;
+  var tr = pixels[idx];
+  var tg = pixels[idx + 1];
+  var tb = pixels[idx + 2];
+  var ta = pixels[idx + 3];
+
+  var fill = hexToRgbaArray(fillColor);
+  if (tr === fill[0] && tg === fill[1] && tb === fill[2] && ta === fill[3]) {
+    return;
+  }
+
+  var stack = [];
+  stack.push(x);
+  stack.push(y);
+
+  while (stack.length > 0) {
+    var yy = stack.pop();
+    var xx = stack.pop();
+
+    if (xx < 0 || xx >= width || yy < 0 || yy >= BASE_HEIGHT) {
+      continue;
+    }
+
+    var i2 = (yy * width + xx) * 4;
+    if (pixels[i2] !== tr || pixels[i2 + 1] !== tg || pixels[i2 + 2] !== tb || pixels[i2 + 3] !== ta) {
+      continue;
+    }
+
+    pixels[i2] = fill[0];
+    pixels[i2 + 1] = fill[1];
+    pixels[i2 + 2] = fill[2];
+    pixels[i2 + 3] = fill[3];
+
+    stack.push(xx + 1);
+    stack.push(yy);
+    stack.push(xx - 1);
+    stack.push(yy);
+    stack.push(xx);
+    stack.push(yy + 1);
+    stack.push(xx);
+    stack.push(yy - 1);
+  }
+
   ctx.putImageData(imageData, 0, 0);
 }
 
 function hexToRgba(hex, alpha) {
-  let cleanHex = hex.replace('#', '');
-  let r = parseInt(cleanHex.substring(0, 2), 16);
-  let g = parseInt(cleanHex.substring(2, 4), 16);
-  let b = parseInt(cleanHex.substring(4, 6), 16);
+  var cleanHex = hex.replace('#', '');
+  var r = parseInt(cleanHex.substring(0, 2), 16);
+  var g = parseInt(cleanHex.substring(2, 4), 16);
+  var b = parseInt(cleanHex.substring(4, 6), 16);
   return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
 }
 
 function hexToRgbaArray(hex) {
-  let cleanHex = hex.replace('#', '');
-  let r = parseInt(cleanHex.substring(0, 2), 16);
-  let g = parseInt(cleanHex.substring(2, 4), 16);
-  let b = parseInt(cleanHex.substring(4, 6), 16);
+  var cleanHex = hex.replace('#', '');
+  var r = parseInt(cleanHex.substring(0, 2), 16);
+  var g = parseInt(cleanHex.substring(2, 4), 16);
+  var b = parseInt(cleanHex.substring(4, 6), 16);
   return [r, g, b, 255];
 }
 
-// 9. MOUSE / POINTER EVENT HANDLERS
-
+// ----------------------
+// MOUSE / POINTER EVENT HANDLERS
+// ----------------------
 function onPointerDown(e) {
-  if (playing) return;
-  let point = getPointFromEvent(e);
+  if (playing) {
+    return;
+  }
+
+  var point = getPointFromEvent(e);
+
   if (brushMode === 'fill') {
     saveUndoState();
     fillArea(point, brushColor);
     commitFrame();
     return;
   }
+
   saveUndoState();
+  restoreFrame();
+
   pointerDown = true;
-  canvas.setPointerCapture(e.pointerId);
+  try {
+    canvas.setPointerCapture(e.pointerId);
+  } catch (err) {
+    // ignore
+  }
   lastPoint = point;
   drawDot(point, true);
 }
 
 function onPointerMove(e) {
-  if (!pointerDown || playing) return;
-  let point = getPointFromEvent(e);
-  if (lastPoint) drawLine(lastPoint, point);
+  if (!pointerDown) {
+    return;
+  }
+  if (playing) {
+    return;
+  }
+  var point = getPointFromEvent(e);
+  if (lastPoint) {
+    drawLine(lastPoint, point);
+  }
   lastPoint = point;
 }
 
 function onPointerUp(e) {
-  if (!pointerDown) return;
+  if (!pointerDown) {
+    return;
+  }
   pointerDown = false;
-  canvas.releasePointerCapture(e.pointerId);
+  try {
+    canvas.releasePointerCapture(e.pointerId);
+  } catch (err) {
+    // ignore
+  }
   commitFrame();
   lastPoint = null;
 }
 
-
-// 10. TIMELINE UI RENDERING
-
+// ----------------------
+// TIMELINE UI RENDERING
+// ----------------------
 function renderTimeline() {
   frameDeck.innerHTML = '';
-  let thumbCtx = thumbSource.getContext('2d');
-  
-  for (let i = 0; i < timeline.length; i++) {
-    let card = document.createElement('div');
-    card.className = 'frame-card' + (i === activeFrame ? ' active' : '');
-    
-    // Custom wrapper layout matches the click detection rules
-    let btn = document.createElement('button');
+  var thumbCtx = thumbSource.getContext('2d');
+
+  for (var i = 0; i < timeline.length; i++) {
+    var card = document.createElement('div');
+    card.className = 'frame-card';
+    if (i === activeFrame) {
+      card.className = card.className + ' active';
+    }
+
+    var btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'frame-selector-btn';
     btn.textContent = 'Frame ' + (i + 1);
     btn.dataset.index = i;
-    
-    let shell = document.createElement('div');
+
+    var shell = document.createElement('div');
     shell.className = 'frame-thumb';
-    
-    let thumb = document.createElement('canvas');
+
+    var thumb = document.createElement('canvas');
     thumb.width = 128;
     thumb.height = 72;
-    
+
     if (timeline[i] && timeline[i].imageData) {
+      thumbCtx.clearRect(0, 0, thumbSource.width, thumbSource.height);
       thumbCtx.putImageData(timeline[i].imageData, 0, 0);
       thumb.getContext('2d').drawImage(thumbSource, 0, 0, 128, 72);
     }
     shell.appendChild(thumb);
-    
-    let acts = document.createElement('div');
+
+    var acts = document.createElement('div');
     acts.className = 'frame-actions';
-    
-    let goBtn = document.createElement('button');
+
+    var goBtn = document.createElement('button');
     goBtn.type = 'button';
     goBtn.className = 'small';
     goBtn.textContent = 'Go';
     goBtn.dataset.index = i;
     goBtn.dataset.action = 'goto';
-    
-    let delBtn = document.createElement('button');
+
+    var delBtn = document.createElement('button');
     delBtn.type = 'button';
     delBtn.className = 'small';
     delBtn.textContent = 'Del';
     delBtn.dataset.index = i;
     delBtn.dataset.action = 'delete';
-    
+
     acts.appendChild(goBtn);
     acts.appendChild(delBtn);
+
     card.appendChild(btn);
     card.appendChild(shell);
     card.appendChild(acts);
     frameDeck.appendChild(card);
   }
+
   frameCount.textContent = timeline.length;
 }
 
 function onFrameDeckClick(e) {
-  let btn = e.target.closest('button');
-  if (!btn || !frameDeck.contains(btn)) return;
-  let idx = Number(btn.dataset.index);
-  
-  if (btn.dataset.action === 'delete') {
-    if (timeline.length <= 1) return;
+  var btn = e.target.closest('button');
+  if (!btn) {
+    return;
+  }
+  if (!frameDeck.contains(btn)) {
+    return;
+  }
+
+  var idx = Number(btn.dataset.index);
+  var action = btn.dataset.action;
+  if (action === 'delete') {
+    if (timeline.length <= 1) {
+      return;
+    }
     timeline.splice(idx, 1);
-    activeFrame = Math.min(activeFrame, timeline.length - 1);
+    if (activeFrame > timeline.length - 1) {
+      activeFrame = timeline.length - 1;
+    }
     restoreFrame();
     renderTimeline();
     return;
   }
+
   selectFrame(idx);
 }
 
-
-// 11. APPLICATION INITIALIZATION
-
+// ----------------------
+// APPLICATION INITIALIZATION
+// ----------------------
 function init() {
   setupCanvas();
   bindEvents();
   loadProjects();
 
   if (currentProjectId) {
-    let proj = projects.find(p => p.id === currentProjectId);
+    var proj = null;
+    for (var i = 0; i < projects.length; i++) {
+      if (projects[i].id === currentProjectId) {
+        proj = projects[i];
+        break;
+      }
+    }
+
     if (proj && proj.frames && proj.frames.length) {
       loadProject(currentProjectId);
     } else {
@@ -707,12 +1187,14 @@ function init() {
   }
 
   setColor(brushColor);
+  if (onionToggle) onionToggle.checked = onionEnabled;
+  if (onionOpacityRange) onionOpacityRange.value = Math.round(onionOpacity * 100);
+  setOnionOpacity(onionOpacity);
   syncFPS(Number(fpsRange.value));
-  syncOnion(Number(onionRange.value));
-  
-  requestAnimationFrame(function(t) { 
-    lastTime = t; 
-    loop(t); 
+
+  requestAnimationFrame(function(t) {
+    lastTime = t;
+    loop(t);
   });
 }
 
