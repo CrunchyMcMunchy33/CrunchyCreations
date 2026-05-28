@@ -14,13 +14,15 @@
 html, body {
   margin: 0;
   min-height: 100%;
+  width: 100%;
+  max-width: 100%;
   overflow-x: hidden;
   background: radial-gradient(circle at top, rgba(122, 92, 255, .12), transparent 37%), var(--bg);
   color: var(--text);
   font: 400 16px/1.5 system-ui, sans-serif;
 }
 
-body { padding: 24px; }
+body { padding: 24px; min-width: 0; }
 button, input { font: inherit; color: inherit; }
 
 
@@ -195,13 +197,13 @@ aside { display: grid; gap: 18px; min-height: 640px; }
 
 
 /* 6. TIMELINE ENGINE MODULE */
-.timeline-controls, .timeline-buttons, .timeline-fps-controls, .frame-actions { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+.timeline-controls, .timeline-buttons, .timeline-fps-controls, .frame-actions { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; min-width: 0; }
 .timeline-controls { justify-content: space-between; }
 .timeline-buttons, .timeline-fps-controls { gap: 10px; }
 .timeline-controls button, .frame-actions button.small { min-width: 100px; }
 .timeline-controls input[type=range] { padding: 0; }
-.frame-actions { gap: 10px; flex-wrap: nowrap; }
-.frame-sequence-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 10px 0; }
+.frame-actions { gap: 10px; flex-wrap: wrap; }
+.frame-sequence-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 10px 0; min-width: 0; }
 .frame-sequence-header h2, .frame-sequence-header .frame-note { color: rgba(234, 238, 241, .72); font-size: .95rem; }
 
 
