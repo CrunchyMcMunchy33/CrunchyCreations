@@ -159,18 +159,36 @@ aside { display: grid; gap: 18px; min-height: 640px; }
 
 /* 5. SELECTION UTILITIES (BRUSHES & COLORS) */
 .brush-list, .color-palette, .timeline-buttons, .timeline-fps-controls, .frame-actions { display: grid; gap: 10px; }
-.brush-list { grid-template-columns: 1fr; }
+.brush-list { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+
+.brush-item {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+}
+
+.brush-controls {
+  display: grid;
+  gap: 4px;
+  padding: 0 4px;
+}
+
+.brush-controls label {
+  font-size: .78rem;
+  color: var(--muted);
+  gap: 8px;
+}
 
 .brush-button {
-  display: grid;
-  gap: 8px;
-  padding: 16px;
-  border-radius: 18px;
-  text-align: left;
+  display: block;
+  padding: 10px 11px;
+  border-radius: 12px;
+  text-align: center;
+  font-size: .84rem;
+  line-height: 1.25;
   background: rgba(255, 255, 255, .02);
 }
 
-.brush-button small { color: rgba(234, 238, 241, .74); font-size: .85rem; }
 .brush-button.active, .brush-button:hover { border-color: rgba(122, 92, 255, .45); transform: translateY(-1px); }
 .brush-button.active { box-shadow: 0 0 0 2px rgba(68, 178, 255, .75); }
 .color-palette { grid-template-columns: repeat(6, minmax(0, 1fr)); }

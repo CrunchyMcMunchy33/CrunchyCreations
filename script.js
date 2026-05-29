@@ -6,6 +6,9 @@ const fpsCounter = document.getElementById('fpsCounter'), playPauseBtn = documen
 const fpsRange = document.getElementById('fpsRange'), fpsDownBtn = document.getElementById('fpsDownBtn'), fpsUpBtn = document.getElementById('fpsUpBtn'), timelinePlayback = document.getElementById('timelinePlayback'), sizeRange = document.getElementById('sizeRange'), opacityRange = document.getElementById('opacityRange');
 const colorPicker = document.getElementById('colorPicker'), colorLabel = document.getElementById('colorValue'), brushName = document.getElementById('brushName'), sizeLabel = document.getElementById('sizeValue'), opacityLabel = document.getElementById('opacityValue'), fpsLabel = document.getElementById('fpsValue'), fpsDisplay = document.getElementById('fpsDisplay');
 const onionToggle = document.getElementById('onionToggle'), onionOpacityRange = document.getElementById('onionOpacityRange'), onionOpacityLabel = document.getElementById('onionOpacityValue'), frameCount = document.getElementById('frameCount'), frameDeck = document.getElementById('frameDeck');
+const mudFrequencyRange = document.getElementById('mudFrequencyRange'), mudFrequencyLabel = document.getElementById('mudFrequencyValue');
+const hairThicknessRange = document.getElementById('hairThicknessRange'), hairThicknessLabel = document.getElementById('hairThicknessValue');
+const hairFrequencyRange = document.getElementById('hairFrequencyRange'), hairFrequencyLabel = document.getElementById('hairFrequencyValue');
 const brushButtons = document.querySelectorAll('.brush-button');
 const swatches = document.querySelectorAll('.color-swatch');
 const homeBtn = document.getElementById('homeBtn');
@@ -17,6 +20,8 @@ let devicePixelRatio = window.devicePixelRatio;
 if (devicePixelRatio === undefined || devicePixelRatio === null) devicePixelRatio = 1;
 let studioNameModalCallback = null, studioNameModalData = null;
 let brushMode = 'technical', brushSize = 28, brushOpacity = 0.92, brushColor = '#000000';
+let mudSplashFrequency = 6, hairThickness = 2, hairFrequency = 7;
+let smearColor = null;
 let onionOpacity = ONION_OPACITY_DEFAULT, onionEnabled = true;
 let timeline = [], activeFrame = 0, playing = false;
 let pointerDown = false, lastPoint = null, shapeStartPoint = null, shapeBaseImage = null;
@@ -119,6 +124,24 @@ function bindEvents() {
     setText(opacityLabel, Math.round(brushOpacity * 100));
   });
   colorPicker.addEventListener('input', function(e) { setColor(e.target.value); });
+  if (mudFrequencyRange) {
+    mudFrequencyRange.addEventListener('input', function(e) {
+      mudSplashFrequency = clamp(Number(e.target.value) || 1, 1, 12);
+      setText(mudFrequencyLabel, mudSplashFrequency);
+    });
+  }
+  if (hairThicknessRange) {
+    hairThicknessRange.addEventListener('input', function(e) {
+      hairThickness = clamp(Number(e.target.value) || 1, 1, 10);
+      setText(hairThicknessLabel, hairThickness);
+    });
+  }
+  if (hairFrequencyRange) {
+    hairFrequencyRange.addEventListener('input', function(e) {
+      hairFrequency = clamp(Number(e.target.value) || 1, 1, 20);
+      setText(hairFrequencyLabel, hairFrequency);
+    });
+  }
   frameDeck.addEventListener('click', onFrameDeckClick);
   for (var i = 0; i < brushButtons.length; i++) brushButtons[i].addEventListener('click', onBrushSelect);
   for (var j = 0; j < swatches.length; j++) {
@@ -523,6 +546,58 @@ function drawDot(point, isDown) {
     ctx.restore();
     return;
   }
+  if (brushMode === 'mudsplash') {
+    var splashCount = clamp(mudSplashFrequency, 1, 12);
+    ctx.save();
+    ctx.fillStyle = brushColor;
+    for (var m = 0; m < splashCount; m++) {
+      var angle = Math.random() * Math.PI * 2;
+      var distance = brushSize * (0.18 + Math.random() * 1.7);
+      var dropX = point.x + Math.cos(angle) * distance;
+      var dropY = point.y + Math.sin(angle) * distance;
+      var dropR = brushSize * (0.05 + Math.random() * 0.18);
+      ctx.globalAlpha = brushOpacity * (0.2 + Math.random() * 0.65);
+      ctx.beginPath();
+      ctx.arc(dropX, dropY, dropR, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+    return;
+  }
+  if (brushMode === 'hair') {
+    var tapStrands = clamp(hairFrequency, 1, 20);
+    var tapWidth = Math.max(0.4, hairThickness * 0.45);
+    var tapLength = brushSize * 0.7;
+    var tapSpread = Math.max(1, brushSize * 0.35);
+    ctx.save();
+    ctx.strokeStyle = brushColor;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    for (var h = 0; h < tapStrands; h++) {
+      var offset = tapStrands === 1 ? 0 : ((h / (tapStrands - 1)) - 0.5) * 2 * tapSpread;
+      var jitter = (Math.random() - 0.5) * Math.max(0.6, brushSize * 0.08);
+      var sx = point.x + offset + jitter;
+      var sy = point.y - tapLength * 0.5;
+      var ex = point.x + offset + jitter;
+      var ey = point.y + tapLength * 0.5;
+      ctx.globalAlpha = brushOpacity * (0.22 + Math.random() * 0.45);
+      ctx.lineWidth = tapWidth * (0.85 + Math.random() * 0.3);
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(ex, ey);
+      ctx.stroke();
+    }
+    ctx.restore();
+    return;
+  }
+  if (brushMode === 'smear') {
+    var sampled = sampleCanvasColor(point);
+    if (!smearColor) smearColor = sampled;
+    var mixedCarry = blendColor(smearColor, sampled, 0.5);
+    applySmearBlend(point, mixedCarry, brushOpacity * 0.35);
+    smearColor = mixedCarry;
+    return;
+  }
   ctx.save();
   ctx.globalAlpha = brushOpacity;
   ctx.fillStyle = brushColor;
@@ -532,6 +607,68 @@ function drawDot(point, isDown) {
   ctx.restore();
 }
 function drawLine(start, end) {
+  if (brushMode === 'smear') {
+    var startColor = smearColor || sampleCanvasColor(start);
+    var endColor = sampleCanvasColor(end);
+    var dxSmear = end.x - start.x;
+    var dySmear = end.y - start.y;
+    var distSmear = Math.sqrt(dxSmear * dxSmear + dySmear * dySmear);
+    var stepsSmear = Math.max(2, Math.ceil(distSmear / 2));
+    for (var ss = 0; ss <= stepsSmear; ss++) {
+      var ts = ss / stepsSmear;
+      var point = { x: start.x + dxSmear * ts, y: start.y + dySmear * ts };
+      var gradColor = blendColor(startColor, endColor, ts);
+      applySmearBlend(point, gradColor, brushOpacity * 0.38);
+    }
+    smearColor = endColor;
+    return;
+  }
+  if (brushMode === 'mudsplash') {
+    var mudDx = end.x - start.x;
+    var mudDy = end.y - start.y;
+    var mudDist = Math.sqrt(mudDx * mudDx + mudDy * mudDy);
+    var mudSpacing = Math.max(brushSize * 0.85, 8);
+    var mudSteps = Math.max(1, Math.ceil(mudDist / mudSpacing));
+    for (var ms = 0; ms <= mudSteps; ms++) {
+      var mt = ms / mudSteps;
+      drawDot({ x: start.x + mudDx * mt, y: start.y + mudDy * mt }, false);
+    }
+    return;
+  }
+  if (brushMode === 'hair') {
+    var hairDx = end.x - start.x;
+    var hairDy = end.y - start.y;
+    var hairDist = Math.sqrt(hairDx * hairDx + hairDy * hairDy);
+    if (hairDist <= 0.001) {
+      drawDot(end, false);
+      return;
+    }
+    var hairNx = -hairDy / hairDist;
+    var hairNy = hairDx / hairDist;
+    var strandCount = clamp(hairFrequency, 1, 20);
+    var strandSpread = Math.max(1, brushSize * 0.36);
+    var strandWidth = Math.max(0.4, hairThickness * 0.45);
+    ctx.save();
+    ctx.strokeStyle = brushColor;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    for (var hs = 0; hs < strandCount; hs++) {
+      var hOffset = strandCount === 1 ? 0 : ((hs / (strandCount - 1)) - 0.5) * 2 * strandSpread;
+      var hJitter = (Math.random() - 0.5) * Math.max(0.7, brushSize * 0.07);
+      var sx = start.x + hairNx * hOffset + hJitter;
+      var sy = start.y + hairNy * hOffset + hJitter;
+      var ex = end.x + hairNx * hOffset + hJitter;
+      var ey = end.y + hairNy * hOffset + hJitter;
+      ctx.globalAlpha = brushOpacity * (0.24 + Math.random() * 0.4);
+      ctx.lineWidth = strandWidth * (0.85 + Math.random() * 0.3);
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(ex, ey);
+      ctx.stroke();
+    }
+    ctx.restore();
+    return;
+  }
   var dx = end.x - start.x;
   var dy = end.y - start.y;
   var dist = Math.sqrt(dx * dx + dy * dy);
@@ -615,6 +752,45 @@ function hexToRgbaArray(hex) {
     255
   ];
 }
+function sampleCanvasColor(point) {
+  var x = clamp(Math.floor(point.x), 0, BASE_WIDTH - 1);
+  var y = clamp(Math.floor(point.y), 0, BASE_HEIGHT - 1);
+  var px = ctx.getImageData(x, y, 1, 1).data;
+  return { r: px[0], g: px[1], b: px[2], a: px[3] / 255 };
+}
+function blendColor(c1, c2, t) {
+  return {
+    r: Math.round(c1.r * (1 - t) + c2.r * t),
+    g: Math.round(c1.g * (1 - t) + c2.g * t),
+    b: Math.round(c1.b * (1 - t) + c2.b * t),
+    a: c1.a * (1 - t) + c2.a * t
+  };
+}
+function applySmearBlend(point, targetColor, strength) {
+  var radius = Math.max(1, Math.floor(brushSize * 0.14));
+  var s = clamp(strength, 0, 1);
+  var left = clamp(Math.floor(point.x - radius), 0, BASE_WIDTH - 1);
+  var right = clamp(Math.floor(point.x + radius), 0, BASE_WIDTH - 1);
+  var top = clamp(Math.floor(point.y - radius), 0, BASE_HEIGHT - 1);
+  var bottom = clamp(Math.floor(point.y + radius), 0, BASE_HEIGHT - 1);
+  var width = right - left + 1;
+  var height = bottom - top + 1;
+  if (width <= 0 || height <= 0) return;
+  var imageData = ctx.getImageData(left, top, width, height);
+  var data = imageData.data;
+  for (var y = 0; y < height; y++) {
+    for (var x = 0; x < width; x++) {
+      var dx = x + left - point.x;
+      var dy = y + top - point.y;
+      if ((dx * dx + dy * dy) > radius * radius) continue;
+      var idx = (y * width + x) * 4;
+      data[idx] = Math.round(data[idx] * (1 - s) + targetColor.r * s);
+      data[idx + 1] = Math.round(data[idx + 1] * (1 - s) + targetColor.g * s);
+      data[idx + 2] = Math.round(data[idx + 2] * (1 - s) + targetColor.b * s);
+    }
+  }
+  ctx.putImageData(imageData, left, top);
+}
 function onPointerDown(e) {
   if (playing) return;
   var point = getPointFromEvent(e);
@@ -633,6 +809,9 @@ function onPointerDown(e) {
     shapeStartPoint = point;
     shapeBaseImage = ctx.getImageData(0, 0, BASE_WIDTH, BASE_HEIGHT);
     return;
+  }
+  if (brushMode === 'smear') {
+    smearColor = sampleCanvasColor(point);
   }
   drawDot(point, true);
 }
@@ -663,6 +842,7 @@ function onPointerUp(e) {
     shapeStartPoint = null;
     shapeBaseImage = null;
   }
+  if (brushMode === 'smear') smearColor = null;
   commitFrame();
   lastPoint = null;
 }
@@ -793,6 +973,9 @@ function init() {
   if (onionOpacityRange) onionOpacityRange.value = Math.round(onionOpacity * 100);
   setOnionOpacity(onionOpacity);
   syncFPS(Number(fpsRange.value));
+  setText(mudFrequencyLabel, mudSplashFrequency);
+  setText(hairThicknessLabel, hairThickness);
+  setText(hairFrequencyLabel, hairFrequency);
   requestAnimationFrame(function(t) { lastTime = t; loop(t); });
 }
 window.addEventListener('DOMContentLoaded', init);
