@@ -1,4 +1,18 @@
+//==========
+// Act as an expert senior developer and code refactoring specialist.
 
+//I need you to refactor and shorten the attached code. Your goal is to compress it as much as possible, ensuring the final output is strictly under 700 lines of code.
+
+//Please adhere to the following strict constraints:
+
+//Target Audience/Skill Level: Keep the coding style at an introductory computer science level (CS 1 or CS 2). Use clear, straightforward logic. Avoid overly advanced patterns, complex external libraries, or hyper-abstract functional programming concepts that a second-year student wouldn't understand.
+
+//Feature Parity: All current features, backend logic, and functionalities must remain 100% identical. Do not remove or alter how the program works.
+
+//Visual Parity: The website must have absolutely zero visual changes. The UI, layout, styling, and responsiveness must look exactly the same as the original.
+
+//How to Shorten: Achieve the line reduction by eliminating redundant code, combining duplicate logic into clean helper functions, removing unnecessary whitespace/comments, and optimizing basic control flows (like nested loops or redundant if/else statements).
+//==========
 const canvas = document.getElementById('studioCanvas');
 const ctx = canvas.getContext('2d');
 
@@ -47,6 +61,47 @@ const BASE_HEIGHT = 1080;
 let devicePixelRatio = window.devicePixelRatio;
 if (devicePixelRatio === undefined || devicePixelRatio === null) {
   devicePixelRatio = 1;
+}
+
+// ====== MODAL UI FUNCTIONS ======
+let studioNameModalCallback = null;
+let studioNameModalData = null;
+
+function showStudioNameModal(title, defaultValue, callback, data) {
+  var modal = document.getElementById('studioNameModal');
+  var titleEl = document.getElementById('studioNameModalTitle');
+  var input = document.getElementById('studioNameInput');
+  var confirmBtn = document.getElementById('studioNameConfirm');
+  var cancelBtn = document.getElementById('studioNameCancel');
+  
+  titleEl.textContent = title;
+  input.value = defaultValue;
+  studioNameModalCallback = callback;
+  studioNameModalData = data;
+  
+  modal.style.display = 'flex';
+  input.focus();
+  input.select();
+
+  function handleConfirm() {
+    if (input.value.trim()) {
+      studioNameModalCallback(input.value.trim(), studioNameModalData);
+      modal.style.display = 'none';
+    }
+  }
+
+  function handleCancel() {
+    modal.style.display = 'none';
+  }
+
+  confirmBtn.onclick = handleConfirm;
+  cancelBtn.onclick = handleCancel;
+  input.onkeypress = function(e) {
+    if (e.key === 'Enter') handleConfirm();
+  };
+  input.onkeydown = function(e) {
+    if (e.key === 'Escape') handleCancel();
+  };
 }
 
 let brushMode = 'technical';
@@ -292,59 +347,66 @@ function saveToGallery() {
     pid = Date.now().toString();
   }
 
-  var project = {
-    id: pid,
-    name: 'Animation ' + Date.now(),
-    created: Date.now(),
-    fps: Number(fpsRange.value) || 12,
-    frames: [],
-    thumb: null
-  };
+  showStudioNameModal(
+    'Name Your Animation',
+    'My Animation',
+    function(animationName, projectId) {
+      var project = {
+        id: projectId,
+        name: animationName,
+        created: Date.now(),
+        fps: Number(fpsRange.value) || 12,
+        frames: [],
+        thumb: null
+      };
 
-  var tctx = thumbSource.getContext('2d');
-  var tmp = document.createElement('canvas');
-  tmp.width = 640;
-  tmp.height = 360;
-  var t2 = tmp.getContext('2d');
+      var tctx = thumbSource.getContext('2d');
+      var tmp = document.createElement('canvas');
+      tmp.width = 640;
+      tmp.height = 360;
+      var t2 = tmp.getContext('2d');
 
-  for (var i = 0; i < timeline.length; i++) {
-    var frame = timeline[i];
-    if (frame && frame.imageData) {
-      tctx.clearRect(0, 0, thumbSource.width, thumbSource.height);
-      tctx.putImageData(frame.imageData, 0, 0);
-      t2.clearRect(0, 0, tmp.width, tmp.height);
-      t2.drawImage(thumbSource, 0, 0, tmp.width, tmp.height);
-      var dataUrl = tmp.toDataURL('image/png');
-      project.frames.push(dataUrl);
-      if (!project.thumb) {
-        project.thumb = dataUrl;
+      for (var i = 0; i < timeline.length; i++) {
+        var frame = timeline[i];
+        if (frame && frame.imageData) {
+          tctx.clearRect(0, 0, thumbSource.width, thumbSource.height);
+          tctx.putImageData(frame.imageData, 0, 0);
+          t2.clearRect(0, 0, tmp.width, tmp.height);
+          t2.drawImage(thumbSource, 0, 0, tmp.width, tmp.height);
+          var dataUrl = tmp.toDataURL('image/png');
+          project.frames.push(dataUrl);
+          if (!project.thumb) {
+            project.thumb = dataUrl;
+          }
+        } else {
+          project.frames.push('');
+        }
       }
-    } else {
-      project.frames.push('');
-    }
-  }
 
-  var foundIndex = -1;
-  for (var k = 0; k < projects.length; k++) {
-    if (projects[k].id === project.id) {
-      foundIndex = k;
-      break;
-    }
-  }
+      var foundIndex = -1;
+      for (var k = 0; k < projects.length; k++) {
+        if (projects[k].id === project.id) {
+          foundIndex = k;
+          break;
+        }
+      }
 
-  if (foundIndex >= 0) {
-    projects[foundIndex].name = project.name;
-    projects[foundIndex].created = project.created;
-    projects[foundIndex].fps = project.fps;
-    projects[foundIndex].frames = project.frames;
-    projects[foundIndex].thumb = project.thumb;
-  } else {
-    projects.unshift(project);
-  }
+      if (foundIndex >= 0) {
+        projects[foundIndex].name = project.name;
+        projects[foundIndex].created = project.created;
+        projects[foundIndex].fps = project.fps;
+        projects[foundIndex].frames = project.frames;
+        projects[foundIndex].thumb = project.thumb;
+      } else {
+        projects.unshift(project);
+      }
 
-  currentProjectId = project.id;
-  saveProjects();
-  alert('Saved to gallery');
+      currentProjectId = project.id;
+      saveProjects();
+      alert('Saved to gallery');
+    },
+    pid
+  );
 }
 
 function loadProject(id) {
@@ -1076,6 +1138,8 @@ function renderTimeline() {
   for (var i = 0; i < timeline.length; i++) {
     var card = document.createElement('div');
     card.className = 'frame-card';
+    card.draggable = true;
+    card.dataset.frameIndex = i;
     if (i === activeFrame) {
       card.className = card.className + ' active';
     }
@@ -1123,11 +1187,20 @@ function renderTimeline() {
     card.appendChild(btn);
     card.appendChild(shell);
     card.appendChild(acts);
+    
+    card.addEventListener('dragstart', onFrameDragStart);
+    card.addEventListener('dragover', onFrameDragOver);
+    card.addEventListener('dragend', onFrameDragEnd);
+    card.addEventListener('drop', onFrameDrop);
+    
     frameDeck.appendChild(card);
   }
 
   frameCount.textContent = timeline.length;
 }
+
+// Frame drag-and-drop
+let draggedFrameIndex = null;
 
 function onFrameDeckClick(e) {
   var btn = e.target.closest('button');
@@ -1154,6 +1227,55 @@ function onFrameDeckClick(e) {
   }
 
   selectFrame(idx);
+}
+
+function onFrameDragStart(e) {
+  var card = e.target.closest('.frame-card');
+  if (card && card.dataset.frameIndex !== undefined) {
+    draggedFrameIndex = Number(card.dataset.frameIndex);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/html', card.innerHTML);
+    card.style.opacity = '0.5';
+  }
+}
+
+function onFrameDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+}
+
+function onFrameDragEnd(e) {
+  var cards = frameDeck.querySelectorAll('.frame-card');
+  cards.forEach(function(card) {
+    card.style.opacity = '1';
+    card.classList.remove('drag-over');
+  });
+  draggedFrameIndex = null;
+}
+
+function onFrameDrop(e) {
+  e.preventDefault();
+  var card = e.target.closest('.frame-card');
+  if (card && card.dataset.frameIndex !== undefined && draggedFrameIndex !== null) {
+    var targetIndex = Number(card.dataset.frameIndex);
+    if (draggedFrameIndex !== targetIndex) {
+      var draggedFrame = timeline[draggedFrameIndex];
+      timeline.splice(draggedFrameIndex, 1);
+      var insertIndex = draggedFrameIndex < targetIndex ? targetIndex - 1 : targetIndex;
+      timeline.splice(insertIndex, 0, draggedFrame);
+      
+      if (activeFrame === draggedFrameIndex) {
+        activeFrame = insertIndex;
+      } else if (draggedFrameIndex < activeFrame && insertIndex >= activeFrame) {
+        activeFrame = activeFrame - 1;
+      } else if (draggedFrameIndex > activeFrame && insertIndex < activeFrame) {
+        activeFrame = activeFrame + 1;
+      }
+      
+      restoreFrame();
+      renderTimeline();
+    }
+  }
 }
 
 // ----------------------
