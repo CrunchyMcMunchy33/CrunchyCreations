@@ -101,6 +101,42 @@
                 <small>Remove content with a soft erasure brush</small>
               </button>
             </div>
+
+            <div class="tool-subsection" aria-label="Shape tool selection">
+              <h3>Shapes</h3>
+              <div class="brush-list">
+                <button
+                  class="brush-button"
+                  data-brush="shape-ellipse"
+                  type="button"
+                  role="radio"
+                  aria-checked="false"
+                >
+                  Circle / Oval
+                  <small>Click and drag to draw an ellipse outline</small>
+                </button>
+                <button
+                  class="brush-button"
+                  data-brush="shape-rect"
+                  type="button"
+                  role="radio"
+                  aria-checked="false"
+                >
+                  Square / Rectangle
+                  <small>Click and drag to draw a rectangle outline</small>
+                </button>
+                <button
+                  class="brush-button"
+                  data-brush="shape-line"
+                  type="button"
+                  role="radio"
+                  aria-checked="false"
+                >
+                  Line
+                  <small>Click and drag to draw a straight line</small>
+                </button>
+              </div>
+            </div>
           </div>
         </details>
 
@@ -254,6 +290,18 @@
         <div style="display: flex; gap: 10px; justify-content: flex-end;">
           <button id="studioNameCancel" type="button" style="padding: 8px 16px; background: #ddd; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">Cancel</button>
           <button id="studioNameConfirm" type="button" style="padding: 8px 16px; background: #7a5cff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">Confirm</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="saveSuccessModal" class="app-modal" style="display: none" aria-live="polite">
+      <div class="app-modal-card">
+        <button id="saveSuccessClose" class="app-modal-close" type="button" aria-label="Close save dialog">×</button>
+        <h2>Saved to Gallery</h2>
+        <p>Your animation was saved successfully.</p>
+        <div class="app-modal-actions">
+          <button id="saveSuccessStay" type="button">Keep Editing</button>
+          <button id="saveSuccessHome" type="button" class="primary">Home</button>
         </div>
       </div>
     </div>
